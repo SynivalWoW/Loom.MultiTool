@@ -130,9 +130,11 @@ def run_orchestration(
     result['valid'] = vertices['vertex_safe'] and not assets['missing_textures']
 
     if gen_dbc:
-        dbc_path = os.path.join(target_dir, f'{internal_name}_CreatureDisplayInfo.dbc')
-        loom_dbc_generator.generate_creature_display_info(dbc_path, mapping, resolved_display_id)
-        result['dbc'] = os.path.basename(dbc_path)
+        chain_mapping = dict(mapping)
+        chain_mapping.setdefault('entry', result.get('entry'))
+        chain = loom_dbc_generator.generate_display_chain(target_dir, chain_mapping, resolved_display_id)
+        result['dbc'] = chain['creature_display_info']
+        result['dbc_chain'] = chain
 
     return result
 

@@ -21,11 +21,13 @@ Pure-stdlib (``struct``/``dataclasses``); imports no GUI/Windows modules.
 from __future__ import annotations
 
 import dataclasses
+import os
 import struct
 import sys
 from typing import Sequence
 
 from dbc_records.creature_display_info import CreatureDisplayInfoRecord
+from dbc_records.creature_model_data import CreatureModelDataRecord
 
 WDBC_MAGIC = b'WDBC'
 _HEADER_STRUCT = struct.Struct('<4sIIII')
@@ -105,13 +107,17 @@ def parse_dbc(data: bytes) -> dict:
     }
 
 
-def creature_display_info_row(mapping: dict, display_id: int) -> list:
-    """Build a CreatureDisplayInfo row (in field order) from a Loom_ID_Map entry + display id."""
+def creature_display_info_row(mapping: dict, display_id: int, model_id: int | None = None) -> list:
+    """Build a CreatureDisplayInfo row (in field order) from a Loom_ID_Map entry + display id.
+
+    Column order/types verified against WDBX Editor's authoritative ``WotLK 3.3.5 (12340)``
+    definition (16 columns). ``model_id`` is the CreatureModelData id this display points at.
+    """
     textures = mapping.get('texture_slots', {})
     internal_name = mapping.get('internal_name', '')
     return [
-        display_id,                              # id
-        mapping.get('model', 0),                 # model (CreatureModelData id)
+        display_id,                                          # id (ID)
+        model_id if model_id is not None else mapping.get('model', 0),  # model (ModelID -> CreatureModelData.ID)
         mapping.get('sound', 0),                 # sound
         0,                                       # extra_display_information
         float(mapping.get('scale', 1.0)),        # scale
@@ -129,11 +135,69 @@ def creature_display_info_row(mapping: dict, display_id: int) -> list:
     ]
 
 
-def generate_creature_display_info(path: str, mapping: dict, display_id: int) -> int:
+def generate_creature_display_info(path: str, mapping: dict, display_id: int, model_id: int | None = None) -> int:
     """Write a single-row CreatureDisplayInfo.dbc for one retroported model."""
     field_types = types_of(CreatureDisplayInfoRecord)
-    row = creature_display_info_row(mapping, display_id)
+    row = creature_display_info_row(mapping, display_id, model_id)
     return write_dbc(path, field_types, [row])
+
+
+def creature_model_data_row(model_id: int, model_path: str, mapping: dict) -> list:
+    """Build a CreatureModelData row (28 columns, verified against WDBX WotLK 12340)."""
+    return [
+        model_id,                                    # id (ID)
+        0,                                           # flags
+        model_path,                                  # model_path (ModelName, e.g. Creature\\folder\\name.m2)
+        0,                                           # size_class
+        float(mapping.get('scale', 1.0)),            # model_scale
+        0,                                           # blood_level (BloodID)
+        0,                                           # footprint (FootprintTextureID)
+        0.0, 0.0, 0.0,                               # footprint texture length / width / particle scale
+        0,                                           # foley_material_id
+        0, 0,                                        # footstep / deaththud shake size
+        0,                                           # sound_data (SoundID)
+        float(mapping.get('collision_width', 0.0)),  # collision_width
+        float(mapping.get('collision_height', 0.0)),  # collision_height
+        0.0,                                         # mount_height
+        0.0, 0.0, 0.0,                               # geo_box min x/y/z
+        0.0, 0.0, 0.0,                               # geo_box max x/y/z
+        1.0, 1.0,                                    # world / attached effect scale
+        0.0, 0.0, 0.0,                               # missile collision radius / push / raise
+    ]
+
+
+def generate_creature_model_data(path: str, model_id: int, model_path: str, mapping: dict) -> int:
+    """Write a single-row CreatureModelData.dbc pointing at the model file path."""
+    field_types = types_of(CreatureModelDataRecord)
+    row = creature_model_data_row(model_id, model_path, mapping)
+    return write_dbc(path, field_types, [row])
+
+
+def generate_display_chain(out_dir: str, mapping: dict, display_id: int, model_id: int | None = None, model_path: str | None = None) -> dict:
+    """Write the full custom-display DBC chain: CreatureModelData + CreatureDisplayInfo (wired).
+
+    CreatureDisplayInfo.ModelID -> CreatureModelData.ID -> ModelName (the .m2 path). This is the
+    chain that ``player_shapeshift_model.DisplayID`` ultimately resolves to in the client.
+    """
+    model_id = model_id if model_id is not None else display_id
+    internal = mapping.get('internal_name', 'model')
+    if model_path is None:
+        target = mapping.get('target_folder', '')
+        entry = mapping.get('entry') or f'{internal}.m2'
+        model_path = f'Creature\\{target}\\{entry}' if target else f'Creature\\{entry}'
+
+    cmd_file = os.path.join(out_dir, f'{internal}_CreatureModelData.dbc')
+    cdi_file = os.path.join(out_dir, f'{internal}_CreatureDisplayInfo.dbc')
+    generate_creature_model_data(cmd_file, model_id, model_path, mapping)
+    generate_creature_display_info(cdi_file, mapping, display_id, model_id=model_id)
+
+    return {
+        'creature_model_data': os.path.basename(cmd_file),
+        'creature_display_info': os.path.basename(cdi_file),
+        'model_id': model_id,
+        'display_id': display_id,
+        'model_path': model_path,
+    }
 
 
 def _main(argv: list[str]) -> int:  # pragma: no cover - thin CLI wrapper

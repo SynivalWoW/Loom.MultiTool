@@ -9,6 +9,8 @@ from loom_dbc_generator import (
     parse_dbc,
     generate_creature_display_info,
     creature_display_info_row,
+    generate_creature_model_data,
+    generate_display_chain,
 )
 from dbc_records.creature_display_info import CreatureDisplayInfoRecord
 
@@ -79,3 +81,36 @@ def test_creature_display_info_row_defaults():
     assert len(row) == 16
     assert row[0] == 5
     assert row[13] == 0  # emitter_fix absent -> particles flag 0
+
+
+def test_generate_creature_model_data(tmp_path):
+    out = str(tmp_path / 'cmd.dbc')
+    size = generate_creature_model_data(out, 5000, 'Creature\\druidcat2\\cat.m2', {'scale': 1.0})
+    assert size > 0
+
+    parsed = parse_dbc(open(out, 'rb').read())
+    assert parsed['field_count'] == 28  # verified against WDBX WotLK 12340
+    assert parsed['record_count'] == 1
+    assert struct.unpack('<i', parsed['records'][0:4])[0] == 5000  # ID
+    assert b'Creature\\druidcat2\\cat.m2' in parsed['string_block']  # ModelName path interned
+
+
+def test_generate_display_chain_wires_modelid(tmp_path):
+    mapping = {'internal_name': 'WindsaberCat', 'target_folder': 'druidcat', 'entry': 'cat.m2'}
+    chain = generate_display_chain(str(tmp_path), mapping, 80042, model_id=80042)
+
+    assert (tmp_path / 'WindsaberCat_CreatureModelData.dbc').exists()
+    assert (tmp_path / 'WindsaberCat_CreatureDisplayInfo.dbc').exists()
+    assert chain['model_path'] == 'Creature\\druidcat\\cat.m2'
+
+    cdi = parse_dbc(open(tmp_path / 'WindsaberCat_CreatureDisplayInfo.dbc', 'rb').read())
+    cmd = parse_dbc(open(tmp_path / 'WindsaberCat_CreatureModelData.dbc', 'rb').read())
+    # CreatureDisplayInfo.ModelID (col 1) == CreatureModelData.ID (col 0) == model_id
+    assert struct.unpack('<i', cdi['records'][4:8])[0] == 80042
+    assert struct.unpack('<i', cmd['records'][0:4])[0] == 80042
+
+
+def test_generate_display_chain_derives_model_path(tmp_path):
+    chain = generate_display_chain(str(tmp_path), {'internal_name': 'Cat'}, 7)
+    assert chain['model_path'] == 'Creature\\Cat.m2'  # no target_folder/entry -> derived from internal name
+    assert chain['model_id'] == 7  # defaults to display_id
