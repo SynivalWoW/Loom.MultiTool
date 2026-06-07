@@ -4,4 +4,4 @@
 /ezWoW_integration/
 __pycache__/
 *.pyc
-.pytest_cache/
+.pytest_cache/*.log
