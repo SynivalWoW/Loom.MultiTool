@@ -16,14 +16,20 @@ import json
 import os
 import sys
 
+import glob
+
+from loom_converter import convert_m2
 from loom_id_map import load_id_map, find_mapping
-from loom_orchestrator import run_orchestration
+from loom_orchestrator import run_orchestration, find_entry_m2
+from core_parser import M2File
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Loom headless retroport binary pipeline')
     parser.add_argument('--headless', action='store_true', help='accepted for spec/CLI parity')
     parser.add_argument('--input', required=True, help='To Convert/<Category>/<ModelName> folder')
+    parser.add_argument('--convert', action='store_true', help='run the MD21->MD20 converter first if the model is still Legion')
+    parser.add_argument('--converter', help='path to MultiConverter_Console.exe (default: bundled)')
     parser.add_argument('--fix-combiners', action='store_true', help='rebuild textureCombinerCombos')
     parser.add_argument('--link-assets', action='store_true', help='patch nViews/nName and link skins/anims')
     parser.add_argument('--gen-dbc', action='store_true', help='emit a CreatureDisplayInfo.dbc')
@@ -55,6 +61,19 @@ def run(argv: list[str]) -> int:
     if not os.path.isdir(args.input):
         print(json.dumps({'status': 'error', 'error': f'input not found: {args.input}'}))
         return 1
+
+    # Optional MD21->MD20 conversion before the WotLK repairs.
+    if args.convert:
+        entry = find_entry_m2(args.input)
+        if entry is not None:
+            with M2File(entry) as model:
+                still_md21 = model.is_md21
+            if still_md21:
+                converter = args.converter or None
+                conv = convert_m2(entry, converter) if converter else convert_m2(entry)
+                if not conv['converted']:
+                    print(json.dumps({'status': 'error', 'error': 'MD21->MD20 conversion failed', 'detail': conv}))
+                    return 1
 
     mapping = resolve_mapping(args)
     result = run_orchestration(

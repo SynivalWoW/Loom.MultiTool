@@ -42,6 +42,7 @@ def run_orchestration(
     *,
     fix_combiners: bool = True,
     link_assets: bool = True,
+    align_skins: bool = True,
     gen_dbc: bool = False,
     strip_emitters: bool = False,
     clear_combiner: bool = False,
@@ -77,7 +78,10 @@ def run_orchestration(
     result['is_md21'] = False
 
     if link_assets:
-        asset_linker.link_skins(target_dir)
+        if align_skins:
+            asset_linker.align_skins_to_m2(m2_path, target_dir)  # name skins <m2base>0N so WotLK finds them
+        else:
+            asset_linker.link_skins(target_dir)
         asset_linker.set_nviews_to_skin_count(m2_path, target_dir)  # nViews == count of .skin files
         asset_linker.link_anims(target_dir)
         asset_linker.fix_nname(m2_path, internal_name)
@@ -99,6 +103,7 @@ def run_orchestration(
     resolved_display_id = display_id if display_id is not None else mapping.get('retail_id', 0)
 
     result['skin_count'] = asset_linker.count_skin_profiles(target_dir)
+    result['skins'] = sorted(os.path.basename(p) for p in glob.glob(os.path.join(target_dir, '*.skin')))
     result['combiner_array'] = combiner.get('combiner_array', [])
     result['combiner_action'] = combiner.get('action')
     result['emitter_safe'] = emitters['emitter_safe']

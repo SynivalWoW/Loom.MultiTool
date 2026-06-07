@@ -5,6 +5,7 @@ from asset_linker import (
     patch_nviews,
     count_skin_profiles,
     set_nviews_to_skin_count,
+    align_skins_to_m2,
     validate_vertices,
     check_missing_assets,
     link_skins,
@@ -82,6 +83,26 @@ def test_link_skins_strips_lod(tmp_path):
     assert 'model01.skin' in result
     assert 'model_lod01.skin' not in result
     assert (tmp_path / 'model01.skin').exists()
+
+
+def test_align_skins_to_m2(tmp_path):
+    # Legion export: skins keep the internal name + _lod suffixes; the .m2 has the export name.
+    write_file(str(tmp_path / 'WindsaberCat.m2'), make_m2())
+    write_file(str(tmp_path / 'druidcat2_artifact100.skin'), make_skin())
+    write_file(str(tmp_path / 'druidcat2_artifact1_lod01.skin'), make_skin())
+    write_file(str(tmp_path / 'druidcat2_artifact1_lod02.skin'), make_skin())
+
+    result = align_skins_to_m2(str(tmp_path / 'WindsaberCat.m2'), str(tmp_path))
+
+    assert result == ['WindsaberCat00.skin', 'WindsaberCat01.skin', 'WindsaberCat02.skin']
+    assert (tmp_path / 'WindsaberCat00.skin').exists()
+    assert not (tmp_path / 'druidcat2_artifact1_lod01.skin').exists()
+
+
+def test_align_skins_already_aligned_is_noop(tmp_path):
+    write_file(str(tmp_path / 'Cat.m2'), make_m2())
+    write_file(str(tmp_path / 'Cat00.skin'), make_skin())
+    assert align_skins_to_m2(str(tmp_path / 'Cat.m2'), str(tmp_path)) == ['Cat00.skin']
 
 
 def test_link_anims(tmp_path):

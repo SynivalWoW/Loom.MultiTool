@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import sys
 
 from core_parser import M2File
@@ -126,6 +127,38 @@ def link_skins(model_dir: str) -> list[str]:
             os.rename(path, new_path)
 
     return sorted(os.path.basename(p) for p in glob.glob(os.path.join(model_dir, '*.skin')))
+
+
+def _lod_key(skin_path: str) -> int:
+    """LOD index of a .skin: the ``_lodNN`` suffix, else the trailing two digits (``…00`` = LOD0)."""
+    base = os.path.basename(skin_path)
+    match = re.search(r'_lod(\d+)\.skin$', base, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'(\d\d)\.skin$', base)
+    return int(match.group(1)) if match else 0
+
+
+def align_skins_to_m2(m2_path: str, model_dir: str | None = None) -> list[str]:
+    """Rename the .skin files to ``<m2 basename>{00,01,02,...}.skin`` in LOD order.
+
+    WotLK resolves a model's skin profiles purely from the .m2 filename
+    (``<modelname>0N.skin``) — there is no in-file skin name. After a Legion export the skins
+    keep the *internal* model name (e.g. ``druidcat2_artifact1*``) while the .m2 carries the
+    export name, so the client can't find them. This aligns the skin names to the entry .m2.
+    """
+    model_dir = model_dir or os.path.dirname(m2_path)
+    m2_base = os.path.splitext(os.path.basename(m2_path))[0]
+    skins = sorted(glob.glob(os.path.join(model_dir, '*.skin')), key=_lod_key)
+
+    renamed: list[str] = []
+    for index, path in enumerate(skins):
+        new_name = f'{m2_base}{index:02d}.skin'
+        new_path = os.path.join(model_dir, new_name)
+        if os.path.abspath(path) != os.path.abspath(new_path):
+            os.replace(path, new_path)
+        renamed.append(new_name)
+    return renamed
 
 
 def link_anims(model_dir: str) -> list[str]:
