@@ -15,10 +15,12 @@ def make_m2(
     n_name: int = 0,
     ofs_name: int = 0,
     n_views: int = 1,
+    n_vertices: int = 0,
     n_particle: int = 0,
     n_ribbon: int = 0,
     n_texture_combiner: int = 0,
     combiner_values=None,
+    textures=None,
 ) -> bytes:
     """Build a minimal MD20 .m2 byte string with the requested header values."""
     buf = bytearray(_M2_HEADER)
@@ -26,9 +28,22 @@ def make_m2(
     struct.pack_into('<I', buf, 8, n_name)
     struct.pack_into('<I', buf, 12, ofs_name)
     struct.pack_into('<I', buf, 16, global_flags)
+    struct.pack_into('<I', buf, 60, n_vertices)
     struct.pack_into('<I', buf, 68, n_views)
     struct.pack_into('<I', buf, 288, n_ribbon)
     struct.pack_into('<I', buf, 296, n_particle)
+
+    if textures:
+        tex_block_ofs = len(buf)
+        buf += bytearray(16 * len(textures))  # reserve the texture records
+        for i, name in enumerate(textures):
+            name_bytes = name.encode('ascii') + b'\x00'
+            name_ofs = len(buf)
+            buf += name_bytes
+            struct.pack_into('<I', buf, tex_block_ofs + i * 16 + 8, len(name_bytes))  # M2Array count
+            struct.pack_into('<I', buf, tex_block_ofs + i * 16 + 12, name_ofs)        # M2Array offset
+        struct.pack_into('<I', buf, 80, len(textures))   # nTextures
+        struct.pack_into('<I', buf, 84, tex_block_ofs)   # ofsTextures
 
     if combiner_values is not None:
         ofs = len(buf)

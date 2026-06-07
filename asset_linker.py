@@ -59,6 +59,57 @@ def patch_nviews(m2_path: str, model_dir: str | None = None) -> int:
     return n_views
 
 
+def count_skin_profiles(model_dir: str) -> int:
+    """Number of .skin files in the folder (== the LOD/skin-profile count)."""
+    return len(glob.glob(os.path.join(model_dir, '*.skin')))
+
+
+def set_nviews_to_skin_count(m2_path: str, model_dir: str | None = None) -> int:
+    """Set ``nViews`` (0x44) to EXACTLY the number of .skin files present.
+
+    Per the WotLK MD20 spec, ``num_skin_profiles`` must equal the count of emitted .skin files —
+    a heuristic that guesses a higher value makes the client read skin profiles that do not exist
+    (OOB / Error #132). Returns the value written. Call AFTER ``link_skins``.
+    """
+    model_dir = model_dir or os.path.dirname(m2_path)
+    skin_count = count_skin_profiles(model_dir)
+    if skin_count == 0:
+        return 0
+    with M2File(m2_path) as m2:
+        m2.write_field(M2Offsets.nViews, skin_count)
+    return skin_count
+
+
+def validate_vertices(m2_path: str, max_vertices: int = 21845) -> dict:
+    """Report the vertex count and whether it is within the WotLK-safe limit (~21.8k).
+
+    Models above the client's safe vertex budget are a known Error #132 trigger.
+    """
+    with M2File(m2_path) as m2:
+        vertex_count = m2.n_vertices
+    return {'vertex_count': vertex_count, 'vertex_safe': vertex_count <= max_vertices, 'max_vertices': max_vertices}
+
+
+def check_missing_assets(m2_path: str, model_dir: str | None = None) -> dict:
+    """List referenced .blp textures whose files are missing from the model folder.
+
+    Also reports the .anim count (informational). A missing referenced texture is a frequent
+    Error #132 cause once the model is packaged into the MPQ.
+    """
+    model_dir = model_dir or os.path.dirname(m2_path)
+    with M2File(m2_path) as m2:
+        referenced = m2.read_texture_filenames()
+
+    present = {entry.lower() for entry in os.listdir(model_dir)}
+    missing: list[str] = []
+    for name in referenced:
+        base = os.path.basename(name.replace('\\', '/'))
+        if base and base.lower() not in present:
+            missing.append(base)
+
+    return {'missing_textures': missing, 'anim_count': len(glob.glob(os.path.join(model_dir, '*.anim')))}
+
+
 def link_skins(model_dir: str) -> list[str]:
     """Strip the ``_lod`` infix so skins are named contiguously (``model00.skin`` ...).
 

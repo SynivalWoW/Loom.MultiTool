@@ -3,6 +3,10 @@ import struct
 from asset_linker import (
     get_nviews_from_skin,
     patch_nviews,
+    count_skin_profiles,
+    set_nviews_to_skin_count,
+    validate_vertices,
+    check_missing_assets,
     link_skins,
     link_anims,
     fix_nname,
@@ -32,6 +36,41 @@ def test_patch_nviews_raises_value(tmp_path):
 def test_patch_nviews_no_skins(tmp_path):
     m2 = write_file(str(tmp_path / 'model.m2'), make_m2())
     assert patch_nviews(m2, str(tmp_path)) == 0
+
+
+def test_set_nviews_to_skin_count(tmp_path):
+    # two skin files present, but the bone-count heuristic would say 4 -> the count (2) wins.
+    write_file(str(tmp_path / 'model00.skin'), make_skin(submesh_bone_count=70))
+    write_file(str(tmp_path / 'model01.skin'), make_skin(submesh_bone_count=70))
+    m2 = write_file(str(tmp_path / 'model.m2'), make_m2(n_views=1))
+
+    assert count_skin_profiles(str(tmp_path)) == 2
+    assert set_nviews_to_skin_count(m2, str(tmp_path)) == 2
+    with M2File(m2) as model:
+        assert model.n_views == 2
+
+
+def test_set_nviews_no_skins(tmp_path):
+    m2 = write_file(str(tmp_path / 'model.m2'), make_m2(n_views=1))
+    assert set_nviews_to_skin_count(m2, str(tmp_path)) == 0
+
+
+def test_validate_vertices(tmp_path):
+    safe = write_file(str(tmp_path / 'safe.m2'), make_m2(n_vertices=10000))
+    assert validate_vertices(safe) == {'vertex_count': 10000, 'vertex_safe': True, 'max_vertices': 21845}
+
+    heavy = write_file(str(tmp_path / 'heavy.m2'), make_m2(n_vertices=30000))
+    assert validate_vertices(heavy)['vertex_safe'] is False
+
+
+def test_check_missing_assets(tmp_path):
+    m2 = write_file(str(tmp_path / 'model.m2'), make_m2(textures=['Path\\To\\CatBody.blp', 'Path\\To\\CatEyes.blp']))
+    write_file(str(tmp_path / 'CatBody.blp'), b'BLP')  # present
+    write_file(str(tmp_path / 'stand.anim'), b'\x00')
+
+    report = check_missing_assets(m2, str(tmp_path))
+    assert report['missing_textures'] == ['CatEyes.blp']  # CatBody present, CatEyes missing
+    assert report['anim_count'] == 1
 
 
 def test_link_skins_strips_lod(tmp_path):

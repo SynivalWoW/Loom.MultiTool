@@ -15,6 +15,8 @@ class M2Offsets(IntEnum):
     ofsAnimationLookup = 40
     nBones = 44
     ofsBones = 48
+    nVertices = 60
+    ofsVertices = 64
     nViews = 68
     nColors = 72
     ofsColors = 76

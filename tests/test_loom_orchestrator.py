@@ -17,7 +17,8 @@ def test_run_orchestration_full(tmp_path):
 
     assert result['status'] == 'ok'
     assert result['entry'] == 'model.m2'
-    assert result['nViews'] == 4
+    assert result['nViews'] == 1  # nViews == count of .skin files (one present)
+    assert result['skin_count'] == 1
     assert result['combiner_array'] == [0, 1, 2, 3]
     assert result['combiner_action'] == 'repaired'
     assert 'emitter_safe' in result
@@ -28,6 +29,35 @@ def test_run_orchestration_no_m2(tmp_path):
     result = run_orchestration(str(tmp_path), {'internal_name': 'x'})
     assert result['status'] == 'error'
     assert 'no .m2' in result['error']
+
+
+def test_run_orchestration_rejects_md21(tmp_path):
+    data = bytearray(make_m2())
+    data[0:4] = b'MD21'  # still a Legion chunked file
+    write_file(str(tmp_path / 'model.m2'), bytes(data))
+    result = run_orchestration(str(tmp_path), {'internal_name': 'x'})
+    assert result['status'] == 'error'
+    assert result['is_md21'] is True
+    assert 'MD21' in result['error']
+
+
+def test_run_orchestration_reports_validation(tmp_path):
+    # over-heavy model + a referenced-but-missing texture => not valid
+    write_file(
+        str(tmp_path / 'model.m2'),
+        make_m2(global_flags=0x08, combiner_values=[1, 4], n_vertices=30000, textures=['Path\\CatBody.blp']),
+    )
+    write_file(str(tmp_path / 'model00.skin'), make_skin(submesh_bone_count=70, batches=[(2, 2)]))
+
+    result = run_orchestration(str(tmp_path), {'internal_name': 'Cat'})
+    assert result['status'] == 'ok'
+    assert result['is_md21'] is False
+    assert result['skin_count'] == 1
+    assert result['nViews'] == 1  # nViews == skin count (one .skin file)
+    assert result['vertex_count'] == 30000
+    assert result['vertex_safe'] is False
+    assert result['missing_textures'] == ['CatBody.blp']
+    assert result['valid'] is False
 
 
 def test_run_orchestration_generates_dbc(tmp_path):

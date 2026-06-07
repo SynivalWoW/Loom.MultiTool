@@ -24,16 +24,20 @@ def find_max_combo_index(skin: SkinFile) -> int:
     return skin.max_combo_slot()
 
 
-def repair_combiner(m2_path: str, skin_path: str | None = None, force: bool = False) -> dict:
+def repair_combiner(m2_path: str, skin_path: str | None = None, force: bool = False, clear: bool = False) -> dict:
     """Rebuild ``textureCombinerCombos`` to a safe identity sequence when needed.
+
+    Note: this targets ``global_flags`` bit 0x8 (``flag_use_texture_combiner_combos``) — NOT the
+    unrelated ``M2Batch.flags2`` 0x8 (EDGF). The two share a value but mean different things.
 
     Args:
         m2_path: path to the converted (MD20) .m2 file, opened read/write.
         skin_path: path to a .skin file used to size the array; optional.
         force: rebuild even when the current array already looks large enough.
+        clear: clear the 0x8 flag instead of writing an array (use when no combiner data is needed).
 
     Returns:
-        A summary dict: ``action`` (``repaired`` | ``skipped``), ``global_flags``,
+        A summary dict: ``action`` (``repaired`` | ``cleared`` | ``skipped``), ``global_flags``,
         ``combiner_len``, ``combiner_array`` and ``max_combo_index``.
     """
     needed_len = 0
@@ -44,6 +48,21 @@ def repair_combiner(m2_path: str, skin_path: str | None = None, force: bool = Fa
         flags = m2.global_flags
         has_flag = bool(flags & FLAG_USE_TEXTURE_COMBINER_COMBOS)
         current_len = m2.read_field(M2Offsets.nTextureCombiner) if has_flag else 0
+
+        # Clear the bit when explicitly asked, or when the flag is set but the skin references no
+        # combos at all (a truncated stub with nothing to index) — both are valid Error #132 fixes.
+        if has_flag and not force and (clear or (skin_path is not None and needed_len == 0)):
+            new_flags = flags & ~FLAG_USE_TEXTURE_COMBINER_COMBOS
+            m2.write_field(M2Offsets.globalFlags, new_flags)
+            m2.write_field(M2Offsets.nTextureCombiner, 0)
+            m2.write_field(M2Offsets.ofsTextureCombiner, 0)
+            return {
+                'action': 'cleared',
+                'global_flags': new_flags,
+                'combiner_len': 0,
+                'combiner_array': [],
+                'max_combo_index': needed_len - 1,
+            }
 
         target_len = max(needed_len, current_len)
         # Repair is required when the advertised array is too small for the batches,

@@ -66,6 +66,23 @@ def test_skinfile_no_batches(tmp_path):
     assert SkinFile(path).max_combo_slot() == -1
 
 
+def test_m2file_is_md21(tmp_path):
+    data = bytearray(make_m2())
+    data[0:4] = b'MD21'
+    path = write_file(str(tmp_path / 'legion.m2'), bytes(data))
+    with M2File(path) as m2:
+        assert m2.is_md21 is True
+        assert m2.is_converted is False
+
+
+def test_m2file_vertices_and_texture_filenames(tmp_path):
+    path = write_file(str(tmp_path / 'm.m2'), make_m2(n_vertices=12345, textures=['Creature/Cat/CatBody.blp', 'Creature/Cat/CatEyes.blp']))
+    with M2File(path) as m2:
+        assert m2.n_vertices == 12345
+        names = m2.read_texture_filenames()
+        assert names == ['Creature/Cat/CatBody.blp', 'Creature/Cat/CatEyes.blp']
+
+
 def test_texture_batch_zero_count_uses_one():
     batch = TextureBatch(0, 0, 0, 0, 0, texture_count=0, texture_combo_index=5)
     # with a zero count we still reserve one slot

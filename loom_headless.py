@@ -28,6 +28,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--link-assets', action='store_true', help='patch nViews/nName and link skins/anims')
     parser.add_argument('--gen-dbc', action='store_true', help='emit a CreatureDisplayInfo.dbc')
     parser.add_argument('--strip-emitters', action='store_true', help='zero particle/ribbon emitters')
+    parser.add_argument('--clear-combiner', action='store_true', help='clear the 0x8 flag instead of rebuilding combos')
+    parser.add_argument('--max-vertices', type=int, default=21845, help='WotLK-safe vertex ceiling (default 21845)')
     parser.add_argument('--id-map', help='path to Loom_ID_Map.json')
     parser.add_argument('--internal-name', help='override internal model name')
     parser.add_argument('--display-id', type=int, help='minted DisplayID for DBC generation')
@@ -62,6 +64,8 @@ def run(argv: list[str]) -> int:
         link_assets=args.link_assets,
         gen_dbc=args.gen_dbc,
         strip_emitters=args.strip_emitters,
+        clear_combiner=args.clear_combiner,
+        max_vertices=args.max_vertices,
         display_id=args.display_id,
     )
     print(json.dumps(result, indent=2))

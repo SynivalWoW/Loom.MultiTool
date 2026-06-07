@@ -41,9 +41,13 @@ python loom_headless.py --headless \
     --fix-combiners --link-assets --gen-dbc \
     --id-map Loom_ID_Map.json --display-id 80040
 ```
-It prints a JSON validation summary (`nViews`, `global_flags`, `combiner_array`,
-`emitter_safe`, ...). The orchestrator is realm-agnostic — Live/PTR SQL deployment is delegated
-to the Loom.Keira3 DBAL. Tests: `python -m pytest tests/` (synthetic fixtures, no real assets).
+It prints a JSON validation summary covering the Error #132 matrix: `is_md21` (refuses a still-
+Legion file), `nViews`/`skin_count` (nViews is set to EXACTLY the `.skin` count), `global_flags`,
+`combiner_array`/`combiner_action` (`repaired` | `cleared` | `skipped`), `vertex_count`/`vertex_safe`
+(WotLK ~21.8k ceiling), `missing_textures`, `emitter_safe`, and an overall `valid` gate. Extra flags:
+`--clear-combiner` (clear the 0x8 flag instead of rebuilding), `--max-vertices N`, `--strip-emitters`,
+`--gen-dbc`. The orchestrator is realm-agnostic — Live/PTR SQL deployment is delegated to the
+Loom.Keira3 DBAL. Tests: `python -m pytest tests/` (synthetic fixtures, no real assets).
 
 # Attention
 

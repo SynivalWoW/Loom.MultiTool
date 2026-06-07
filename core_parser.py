@@ -90,6 +90,11 @@ class M2File:
         """True once the model carries the WotLK MD20 magic."""
         return self.magic == MD20_MAGIC
 
+    @property
+    def is_md21(self) -> bool:
+        """True if the file is still a Legion-era chunked MD21 (must be stripped/rebased first)."""
+        return self.magic == MD21_MAGIC
+
     def read_field(self, offset: int, length: int = 4) -> int:
         return Binary.get_int_from_bytes(self.fh, int(offset), length=length)
 
@@ -108,6 +113,30 @@ class M2File:
     @property
     def n_name(self) -> int:
         return self.read_field(M2Offsets.nName)
+
+    @property
+    def n_vertices(self) -> int:
+        return self.read_field(M2Offsets.nVertices)
+
+    def read_texture_filenames(self) -> list[str]:
+        """Return the hard-coded texture filename strings referenced by the model.
+
+        WotLK looks textures up by path, so a converted model carries filename strings in its
+        textures block (type-0 textures). Used to detect missing .blp dependencies.
+        """
+        count = self.read_field(M2Offsets.nTextures)
+        ofs = self.read_field(M2Offsets.ofsTextures)
+        names: list[str] = []
+        for i in range(count):
+            record = ofs + i * 16  # M2Texture = 16 bytes: type, flags, M2Array<char> filename
+            name_len = self.read_field(record + 8)
+            name_ofs = self.read_field(record + 12)
+            if name_len > 0:
+                raw = Binary.read_bytes(self.fh, name_ofs, name_len)
+                name = raw.split(b'\x00', 1)[0].decode('ascii', 'replace')
+                if name:
+                    names.append(name)
+        return names
 
     @property
     def n_particle_emitters(self) -> int:

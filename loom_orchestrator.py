@@ -44,6 +44,8 @@ def run_orchestration(
     link_assets: bool = True,
     gen_dbc: bool = False,
     strip_emitters: bool = False,
+    clear_combiner: bool = False,
+    max_vertices: int = 21845,
     display_id: int | None = None,
 ) -> dict:
     """Run the repair pipeline over ``target_dir`` and return a JSON-serialisable summary."""
@@ -63,19 +65,32 @@ def run_orchestration(
         return result
 
     result['entry'] = os.path.basename(m2_path)
-    skin_path = find_entry_skin(target_dir)
+
+    # Guard: the MD20 repairs would corrupt a still-Legion MD21 (chunked) file. The MD21->MD20
+    # strip + M2Array offset rebasing must happen in the converter first.
+    with M2File(m2_path) as model:
+        if model.is_md21:
+            result['status'] = 'error'
+            result['is_md21'] = True
+            result['error'] = 'model is still MD21 (Legion); run MD21->MD20 conversion first'
+            return result
+    result['is_md21'] = False
 
     if link_assets:
-        asset_linker.patch_nviews(m2_path, target_dir)
         asset_linker.link_skins(target_dir)
+        asset_linker.set_nviews_to_skin_count(m2_path, target_dir)  # nViews == count of .skin files
         asset_linker.link_anims(target_dir)
         asset_linker.fix_nname(m2_path, internal_name)
 
+    skin_path = find_entry_skin(target_dir)
     emitters = asset_linker.evaluate_emitters(m2_path, strip=strip_emitters)
 
     combiner = {'action': 'skipped', 'combiner_array': []}
     if fix_combiners:
-        combiner = combiner_repair.repair_combiner(m2_path, skin_path)
+        combiner = combiner_repair.repair_combiner(m2_path, skin_path, clear=clear_combiner)
+
+    vertices = asset_linker.validate_vertices(m2_path, max_vertices=max_vertices)
+    assets = asset_linker.check_missing_assets(m2_path, target_dir)
 
     with M2File(m2_path) as model:
         result['nViews'] = model.n_views
@@ -83,12 +98,19 @@ def run_orchestration(
 
     resolved_display_id = display_id if display_id is not None else mapping.get('retail_id', 0)
 
+    result['skin_count'] = asset_linker.count_skin_profiles(target_dir)
     result['combiner_array'] = combiner.get('combiner_array', [])
     result['combiner_action'] = combiner.get('action')
     result['emitter_safe'] = emitters['emitter_safe']
     result['particles'] = emitters['particles']
     result['ribbons'] = emitters['ribbons']
+    result['vertex_count'] = vertices['vertex_count']
+    result['vertex_safe'] = vertices['vertex_safe']
+    result['missing_textures'] = assets['missing_textures']
+    result['anim_count'] = assets['anim_count']
     result['display_id'] = resolved_display_id
+    # Overall gate: only deploy when the binary validation metrics pass (spec §7).
+    result['valid'] = vertices['vertex_safe'] and not assets['missing_textures']
 
     if gen_dbc:
         dbc_path = os.path.join(target_dir, f'{internal_name}_CreatureDisplayInfo.dbc')

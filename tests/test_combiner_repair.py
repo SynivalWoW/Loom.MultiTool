@@ -64,3 +64,21 @@ def test_repair_force_without_skin(tmp_path):
     assert result['action'] == 'repaired'
     assert result['combiner_len'] == 1
     assert result['combiner_array'] == [0]
+
+
+def test_repair_clears_flag_explicitly(tmp_path):
+    m2 = write_file(str(tmp_path / 'm.m2'), make_m2(global_flags=0x08, combiner_values=[1, 4]))
+    result = repair_combiner(m2, None, clear=True)
+    assert result['action'] == 'cleared'
+    n, _, flags = _read_combiner(m2)
+    assert n == 0
+    assert not (flags & FLAG_USE_TEXTURE_COMBINER_COMBOS)
+
+
+def test_repair_clears_flag_when_skin_has_no_combos(tmp_path):
+    # flag set but the skin references no combos at all -> clear the bit (nothing to index).
+    m2 = write_file(str(tmp_path / 'm.m2'), make_m2(global_flags=0x08, combiner_values=[1, 4]))
+    skin = write_file(str(tmp_path / 'm00.skin'), make_skin(batches=[]))
+    result = repair_combiner(m2, skin)
+    assert result['action'] == 'cleared'
+    assert result['combiner_len'] == 0
