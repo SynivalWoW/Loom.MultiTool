@@ -1,7 +1,8 @@
-﻿.idea/
+.idea/
 *.iml
 *.xml
 /ezWoW_integration/
 __pycache__/
 *.pyc
-.pytest_cache/*.log
+.pytest_cache/
+*.log
