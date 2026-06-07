@@ -60,6 +60,28 @@ def test_run_orchestration_reports_validation(tmp_path):
     assert result['valid'] is False
 
 
+def test_run_orchestration_convert_then_repair(tmp_path, monkeypatch):
+    # a still-MD21 model + convert=True with a fake converter that flips the magic to MD20.
+    data = bytearray(make_m2(global_flags=0x08, combiner_values=[1, 4]))
+    data[0:4] = b'MD21'
+    write_file(str(tmp_path / 'model.m2'), bytes(data))
+    write_file(str(tmp_path / 'model00.skin'), make_skin(submesh_bone_count=70, batches=[(2, 2)]))
+
+    def fake_convert(m2_path, *args, **kwargs):
+        buf = bytearray(open(m2_path, 'rb').read())
+        buf[0:4] = b'MD20'
+        open(m2_path, 'wb').write(buf)
+        return {'converted': True, 'm2_path': m2_path, 'magic': 'MD20', 'returncode': 0}
+
+    monkeypatch.setattr('loom_orchestrator.loom_converter.convert_m2', fake_convert)
+
+    result = run_orchestration(str(tmp_path), {'internal_name': 'Cat'}, convert=True)
+    assert result['status'] == 'ok'
+    assert result['converted'] is True
+    assert result['is_md21'] is False
+    assert result['combiner_array'] == [0, 1, 2, 3]
+
+
 def test_run_orchestration_generates_dbc(tmp_path):
     _build_model_dir(tmp_path)
     result = run_orchestration(str(tmp_path), {'internal_name': 'WindsaberCat'}, gen_dbc=True, display_id=80040)

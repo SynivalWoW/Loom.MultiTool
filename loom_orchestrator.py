@@ -18,6 +18,7 @@ import sys
 
 import asset_linker
 import combiner_repair
+import loom_converter
 import loom_dbc_generator
 from core_parser import M2File
 
@@ -40,6 +41,8 @@ def run_orchestration(
     target_dir: str,
     mapping: dict,
     *,
+    convert: bool = False,
+    converter_path: str | None = None,
     fix_combiners: bool = True,
     link_assets: bool = True,
     align_skins: bool = True,
@@ -65,16 +68,25 @@ def run_orchestration(
         result['error'] = 'no .m2 file found in target folder'
         return result
 
+    with M2File(m2_path) as model:
+        md21 = model.is_md21
+
+    # Optional MD21->MD20 conversion (the converter does the chunk strip + offset rebasing).
+    if convert and md21:
+        conversion = loom_converter.convert_m2(m2_path, converter_path or loom_converter.DEFAULT_CONVERTER)
+        result['converted'] = conversion.get('converted')
+        m2_path = find_entry_m2(target_dir) or m2_path  # the converter may lower-case/rename it
+        with M2File(m2_path) as model:
+            md21 = model.is_md21
+
     result['entry'] = os.path.basename(m2_path)
 
-    # Guard: the MD20 repairs would corrupt a still-Legion MD21 (chunked) file. The MD21->MD20
-    # strip + M2Array offset rebasing must happen in the converter first.
-    with M2File(m2_path) as model:
-        if model.is_md21:
-            result['status'] = 'error'
-            result['is_md21'] = True
-            result['error'] = 'model is still MD21 (Legion); run MD21->MD20 conversion first'
-            return result
+    # Guard: the MD20 repairs would corrupt a still-Legion MD21 (chunked) file.
+    if md21:
+        result['status'] = 'error'
+        result['is_md21'] = True
+        result['error'] = 'model is still MD21 (Legion); run MD21->MD20 conversion first (pass --convert)'
+        return result
     result['is_md21'] = False
 
     if link_assets:
@@ -136,9 +148,14 @@ def _main(argv: list[str]) -> int:  # pragma: no cover - thin CLI wrapper
     display_id = None
     if '--display-id' in rest:
         display_id = int(rest[rest.index('--display-id') + 1])
+    converter_path = None
+    if '--converter' in rest:
+        converter_path = rest[rest.index('--converter') + 1]
     result = run_orchestration(
         target_dir,
         mapping,
+        convert='--convert' in rest,
+        converter_path=converter_path,
         gen_dbc='--gen-dbc' in rest,
         clear_combiner='--clear-combiner' in rest,
         strip_emitters='--strip-emitters' in rest,
