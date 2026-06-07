@@ -20,6 +20,31 @@ Allows you to shift the model along the x, y, z axes (for example, offsetting he
 Full copying of particles from one model to another
 ## ● TEXTURE COMPONENTS
 A module for working with textures. It will move all exported textures from the wow.export folder to the patch folder, with the option to automatically convert from DXT5 to Indexed (256Color). It will automatically remove extra digits from texture names.
+# Headless Retroport Pipeline (CLI)
+In addition to the GUI, the binary repair logic is available as a head-less, pure-stdlib
+pipeline (no `dearpygui`/Windows dependency) so it can run on CI/CD or be invoked by the
+Loom.Export → orchestrator hook. The modules are:
+
+| Module | Role |
+|--------|------|
+| `core_parser.py` | `M2File` / `SkinFile` readers over the existing `Binary`/`offsets` helpers |
+| `combiner_repair.py` | rebuilds `textureCombinerCombos` to a safe identity array (Error #132 §2.A) |
+| `asset_linker.py` | patches `nViews` (0x44), links skins/anims, repairs `nName`, evaluates emitters |
+| `loom_dbc_generator.py` | writes raw binary WDBC files (e.g. `CreatureDisplayInfo.dbc`) |
+| `loom_orchestrator.py` | runs the repair pipeline over one `To Convert/<Category>/<Model>/` folder, emits JSON |
+| `loom_headless.py` | argparse CLI entrypoint |
+| `loom_id_map.py` / `Loom_ID_Map.json` | maps `retail_id` → `internal_name`/`target_folder`/requirements |
+
+```bash
+python loom_headless.py --headless \
+    --input "To Convert/Druid/Windsaber_Cat_Form" \
+    --fix-combiners --link-assets --gen-dbc \
+    --id-map Loom_ID_Map.json --display-id 80040
+```
+It prints a JSON validation summary (`nViews`, `global_flags`, `combiner_array`,
+`emitter_safe`, ...). The orchestrator is realm-agnostic — Live/PTR SQL deployment is delegated
+to the Loom.Keira3 DBAL. Tests: `python -m pytest tests/` (synthetic fixtures, no real assets).
+
 # Attention
 
 ⚠️ The program is compiled using [Nuitka](https://nuitka.net/). Nuitka converts python code to C++, it allows to create an exe file of minimal size with maximum startup speed. When exe launched, libraries are extracted to the %temp%/WoTLK_Multitool_Data folder. Some antivirus programs may falsely flag this behavior (False Positive) due to unpacking.

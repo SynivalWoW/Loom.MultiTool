@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "mappings": [
+    {
+      "retail_id": 1234567,
+      "internal_name": "Windsaber_Cat_Form",
+      "target_folder": "druidcatharanir",
+      "texture_slots": { "body": 11, "eyes": 12 },
+      "requirements": { "min_version": "MD20", "emitter_fix": true, "is_texvar": true }
+    }
+  ]
+}

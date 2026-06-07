@@ -1,0 +1,3 @@
+# Dev/test dependencies for the head-less retroport pipeline (separate from the UTF-16
+# runtime requirements.txt so the GUI dependency set stays untouched).
+pytest>=8.0

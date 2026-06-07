@@ -4,6 +4,8 @@ from enum import IntEnum
 class M2Offsets(IntEnum):
     # Длина 4 байта
     mdMagic = 0
+    nName = 8
+    ofsName = 12
     globalFlags = 16
     nGlobalSequences = 20
     ofsGlobalSequences = 24
@@ -33,6 +35,8 @@ class M2Offsets(IntEnum):
     ofsTransLookup = 148
     nTexAnimLookup = 152
     ofsTexAnimLookup = 156
+    nRibbonEmitters = 288
+    ofsRibbonEmitters = 292
     nParticleEmitters = 296
     ofsParticleEmitters = 300
     nTextureCombiner = 304
@@ -52,4 +56,37 @@ class M2Lengths(IntEnum):
 
 
 class SkinOffsets(IntEnum):
-    pass
+    # WotLK file-based .skin layout (header carries the 'SKIN' magic).
+    magic = 0
+    nIndices = 4
+    ofsIndices = 8
+    nTriangles = 12
+    ofsTriangles = 16
+    nProperties = 20
+    ofsProperties = 24
+    nSubmeshes = 28
+    ofsSubmeshes = 32
+    nTextureUnits = 36
+    ofsTextureUnits = 40
+    nBones = 44
+
+
+class SkinLengths(IntEnum):
+    submesh = 48
+    textureUnit = 24
+
+
+class SkinBatchOffsets(IntEnum):
+    # Field offsets inside a single 24-byte texture-unit (M2Batch) record.
+    flags = 0
+    priorityPlane = 2
+    shaderId = 4
+    skinSectionIndex = 6
+    geosetIndex = 8
+    colorIndex = 10
+    materialIndex = 12
+    materialLayer = 14
+    textureCount = 16
+    textureComboIndex = 18
+    textureCoordComboIndex = 20
+    textureWeightComboIndex = 22
