@@ -43,12 +43,21 @@ def build_command(m2_path: str, converter: str = DEFAULT_CONVERTER, mono: str = 
     return [converter, m2_path]
 
 
-def convert_m2(m2_path: str, converter: str = DEFAULT_CONVERTER, mono: str = 'mono', runner=subprocess.run, timeout: int = 300) -> dict:
+def convert_m2(
+    m2_path: str,
+    converter: str = DEFAULT_CONVERTER,
+    mono: str = 'mono',
+    runner=subprocess.run,
+    timeout: int = 300,
+    creationflags: int = 0,
+) -> dict:
     """Run the MD21->MD20 conversion on a single .m2 and report the outcome.
 
     Lower-cases the model folder first (off-Windows), runs the converter, then re-reads the magic
-    to confirm the downgrade. mono can hang *after* printing 'Done.', so a timeout is treated as a
-    soft outcome and success is decided by the on-disk magic. ``runner`` is injectable for testing.
+    to confirm the downgrade — so callers never silently proceed on a failed conversion. mono can
+    hang *after* printing 'Done.', so a timeout is treated as a soft outcome and success is decided
+    by the on-disk magic. ``creationflags`` is forwarded to the runner (e.g. CREATE_NO_WINDOW on
+    Windows). ``runner`` is injectable for testing.
     """
     model_dir = os.path.dirname(m2_path) or '.'
     if needs_mono():
@@ -56,7 +65,13 @@ def convert_m2(m2_path: str, converter: str = DEFAULT_CONVERTER, mono: str = 'mo
         m2_path = os.path.join(model_dir, os.path.basename(m2_path).lower())
 
     try:
-        result = runner(build_command(m2_path, converter, mono), capture_output=True, text=True, timeout=timeout)
+        result = runner(
+            build_command(m2_path, converter, mono),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            creationflags=creationflags,
+        )
         returncode = getattr(result, 'returncode', None)
     except subprocess.TimeoutExpired:
         returncode = 'timeout'

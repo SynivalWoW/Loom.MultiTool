@@ -9,6 +9,7 @@ import shutil
 import subprocess
 
 from position_scale import auto_fix_helm_offset
+from loom_converter import convert_m2
 
 from utils.binary import Binary
 from utils.config import Config
@@ -88,9 +89,13 @@ def auto_texture(separated_name: str, model_type_path: str, file_path: str):
     StatusBar.success_info("Converting model...")
     rename_lod(file_path, nViews)
 
-    # Запускаем Multiconverter_Console
-    subprocess.run(work_folder + "MultiConverter_Console.exe " + file_path, creationflags=subprocess.CREATE_NO_WINDOW,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Запускаем Multiconverter_Console через loom_converter (проверяет результат, не падает молча)
+    conversion = convert_m2(file_path, converter=work_folder + "MultiConverter_Console.exe",
+                            creationflags=subprocess.CREATE_NO_WINDOW)
+    if not conversion["converted"]:
+        StatusBar.error_info("ERROR: MD21->MD20 conversion failed (the model is not MD20). "
+                             "Try a newer MultiConverter for newer Legion chunks.")
+        return
 
     # Удаляем лог конвертера
     if os.path.isfile(work_folder + "error.log"):
