@@ -26,8 +26,7 @@ import struct
 import sys
 from typing import Sequence
 
-from dbc_records.creature_display_info import CreatureDisplayInfoRecord
-from dbc_records.creature_model_data import CreatureModelDataRecord
+import dbc_definitions
 
 WDBC_MAGIC = b'WDBC'
 _HEADER_STRUCT = struct.Struct('<4sIIII')
@@ -137,7 +136,7 @@ def creature_display_info_row(mapping: dict, display_id: int, model_id: int | No
 
 def generate_creature_display_info(path: str, mapping: dict, display_id: int, model_id: int | None = None) -> int:
     """Write a single-row CreatureDisplayInfo.dbc for one retroported model."""
-    field_types = types_of(CreatureDisplayInfoRecord)
+    field_types = dbc_definitions.field_types('CreatureDisplayInfo')
     row = creature_display_info_row(mapping, display_id, model_id)
     return write_dbc(path, field_types, [row])
 
@@ -168,7 +167,7 @@ def creature_model_data_row(model_id: int, model_path: str, mapping: dict) -> li
 
 def generate_creature_model_data(path: str, model_id: int, model_path: str, mapping: dict) -> int:
     """Write a single-row CreatureModelData.dbc pointing at the model file path."""
-    field_types = types_of(CreatureModelDataRecord)
+    field_types = dbc_definitions.field_types('CreatureModelData')
     row = creature_model_data_row(model_id, model_path, mapping)
     return write_dbc(path, field_types, [row])
 

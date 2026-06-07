@@ -1,0 +1,233 @@
+{
+  "build": 12340,
+  "source": "WDBX Editor \u2014 WotLK 3.3.5 (12340).xml",
+  "CreatureDisplayInfo": {
+    "fields": [
+      {
+        "name": "ID",
+        "type": "int",
+        "index": true
+      },
+      {
+        "name": "ModelID",
+        "type": "int"
+      },
+      {
+        "name": "SoundID",
+        "type": "int"
+      },
+      {
+        "name": "ExtendedDisplayInfoID",
+        "type": "int"
+      },
+      {
+        "name": "CreatureModelScale",
+        "type": "float"
+      },
+      {
+        "name": "CreatureModelAlpha",
+        "type": "int"
+      },
+      {
+        "name": "TextureVariation",
+        "type": "string",
+        "array": 3
+      },
+      {
+        "name": "PortraitTextureName",
+        "type": "string"
+      },
+      {
+        "name": "BloodLevel",
+        "type": "int"
+      },
+      {
+        "name": "BloodID",
+        "type": "int"
+      },
+      {
+        "name": "NPCSoundID",
+        "type": "int"
+      },
+      {
+        "name": "ParticleColorID",
+        "type": "int"
+      },
+      {
+        "name": "CreatureGeosetData",
+        "type": "int"
+      },
+      {
+        "name": "ObjectEffectPackageID",
+        "type": "int"
+      }
+    ]
+  },
+  "CreatureDisplayInfoExtra": {
+    "fields": [
+      {
+        "name": "ID",
+        "type": "int",
+        "index": true
+      },
+      {
+        "name": "DisplayRaceID",
+        "type": "int"
+      },
+      {
+        "name": "DisplaySexID",
+        "type": "int"
+      },
+      {
+        "name": "SkinID",
+        "type": "int"
+      },
+      {
+        "name": "FaceID",
+        "type": "int"
+      },
+      {
+        "name": "HairStyleID",
+        "type": "int"
+      },
+      {
+        "name": "HairColorID",
+        "type": "int"
+      },
+      {
+        "name": "FacialHairID",
+        "type": "int"
+      },
+      {
+        "name": "NPCItemDisplay",
+        "type": "int",
+        "array": 11
+      },
+      {
+        "name": "Flags",
+        "type": "int"
+      },
+      {
+        "name": "BakeName",
+        "type": "string"
+      }
+    ]
+  },
+  "CreatureModelData": {
+    "fields": [
+      {
+        "name": "ID",
+        "type": "int",
+        "index": true
+      },
+      {
+        "name": "Flags",
+        "type": "int"
+      },
+      {
+        "name": "ModelName",
+        "type": "string"
+      },
+      {
+        "name": "SizeClass",
+        "type": "int"
+      },
+      {
+        "name": "ModelScale",
+        "type": "float"
+      },
+      {
+        "name": "BloodID",
+        "type": "int"
+      },
+      {
+        "name": "FootprintTextureID",
+        "type": "int"
+      },
+      {
+        "name": "FootprintTextureLength",
+        "type": "float"
+      },
+      {
+        "name": "FootprintTextureWidth",
+        "type": "float"
+      },
+      {
+        "name": "FootprintParticleScale",
+        "type": "float"
+      },
+      {
+        "name": "FoleyMaterialID",
+        "type": "int"
+      },
+      {
+        "name": "FootstepShakeSize",
+        "type": "int"
+      },
+      {
+        "name": "DeathThudShakeSize",
+        "type": "int"
+      },
+      {
+        "name": "SoundID",
+        "type": "int"
+      },
+      {
+        "name": "CollisionWidth",
+        "type": "float"
+      },
+      {
+        "name": "CollisionHeight",
+        "type": "float"
+      },
+      {
+        "name": "MountHeight",
+        "type": "float"
+      },
+      {
+        "name": "GeoBoxMinX",
+        "type": "float"
+      },
+      {
+        "name": "GeoBoxMinY",
+        "type": "float"
+      },
+      {
+        "name": "GeoBoxMinZ",
+        "type": "float"
+      },
+      {
+        "name": "GeoBoxMaxX",
+        "type": "float"
+      },
+      {
+        "name": "GeoBoxMaxY",
+        "type": "float"
+      },
+      {
+        "name": "GeoBoxMaxZ",
+        "type": "float"
+      },
+      {
+        "name": "WorldEffectScale",
+        "type": "float"
+      },
+      {
+        "name": "AttachedEffectScale",
+        "type": "float"
+      },
+      {
+        "name": "MissileCollisionRadius",
+        "type": "float"
+      },
+      {
+        "name": "MissileCollisionPush",
+        "type": "float"
+      },
+      {
+        "name": "MissileCollisionRaise",
+        "type": "float"
+      }
+    ]
+  }
+}
