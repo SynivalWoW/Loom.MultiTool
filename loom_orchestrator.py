@@ -122,11 +122,23 @@ def run_orchestration(
 
 def _main(argv: list[str]) -> int:  # pragma: no cover - thin CLI wrapper
     if len(argv) < 3:
-        print('usage: python loom_orchestrator.py <target_dir> <mapping_json>')
+        print('usage: python loom_orchestrator.py <target_dir> <mapping_json> '
+              '[--gen-dbc] [--display-id N] [--clear-combiner] [--strip-emitters]')
         return 2
     target_dir = argv[1]
     mapping = json.loads(argv[2])
-    result = run_orchestration(target_dir, mapping)
+    rest = argv[3:]
+    display_id = None
+    if '--display-id' in rest:
+        display_id = int(rest[rest.index('--display-id') + 1])
+    result = run_orchestration(
+        target_dir,
+        mapping,
+        gen_dbc='--gen-dbc' in rest,
+        clear_combiner='--clear-combiner' in rest,
+        strip_emitters='--strip-emitters' in rest,
+        display_id=display_id,
+    )
     print(json.dumps(result))
     return 0 if result.get('status') == 'ok' else 1
 
