@@ -7,11 +7,54 @@ from loom_dbc_generator import (
     build_dbc_bytes,
     write_dbc,
     parse_dbc,
+    append_rows_to_dbc,
+    append_rows_to_dbc_file,
     generate_creature_display_info,
     creature_display_info_row,
     generate_creature_model_data,
     generate_display_chain,
 )
+
+
+def _read_string(parsed, offset):
+    block = parsed['string_block']
+    return block[offset:block.index(b'\x00', offset)].decode('utf-8')
+
+
+def test_append_rows_to_dbc_preserves_existing_and_adds_new():
+    field_types = [int, str]
+    base = build_dbc_bytes(field_types, [[1, 'alpha'], [2, 'beta']])
+    merged = append_rows_to_dbc(base, field_types, [[3, 'gamma'], [4, 'alpha']])
+
+    parsed = parse_dbc(merged)
+    assert parsed['record_count'] == 4
+    rs = parsed['record_size']
+    records = parsed['records']
+    # existing rows keep their original string offsets (block only grew at the end)
+    ids = [struct.unpack_from('<i', records, i * rs)[0] for i in range(4)]
+    assert ids == [1, 2, 3, 4]
+    names = [_read_string(parsed, struct.unpack_from('<I', records, i * rs + 4)[0]) for i in range(4)]
+    assert names == ['alpha', 'beta', 'gamma', 'alpha']
+
+
+def test_append_rows_to_dbc_rejects_field_count_mismatch():
+    base = build_dbc_bytes([int, str], [[1, 'x']])
+    with pytest.raises(ValueError, match='field-count mismatch'):
+        append_rows_to_dbc(base, [int, int, int], [[1, 2, 3]])
+
+
+def test_append_rows_to_dbc_rejects_bad_magic():
+    with pytest.raises(ValueError, match='invalid DBC magic'):
+        append_rows_to_dbc(b'XXXX' + b'\x00' * 16, [int], [[1]])
+
+
+def test_append_rows_to_dbc_file_roundtrip(tmp_path):
+    field_types = [int, str]
+    path = tmp_path / 'x.dbc'
+    write_dbc(str(path), field_types, [[1, 'a']])
+    total = append_rows_to_dbc_file(str(path), field_types, [[2, 'b'], [3, 'c']])
+    assert total == 3
+    assert parse_dbc(path.read_bytes())['record_count'] == 3
 from dbc_records.creature_display_info import CreatureDisplayInfoRecord
 
 

@@ -88,6 +88,60 @@ def write_dbc(path: str, field_types: Sequence[type], rows: Sequence[Sequence]) 
     return len(data)
 
 
+def append_rows_to_dbc(existing: bytes, field_types: Sequence[type], new_rows: Sequence[Sequence]) -> bytes:
+    """Append ``new_rows`` to an existing WDBC, preserving every existing record and string.
+
+    The string block only grows at the end, so existing string offsets stay valid; new strings are
+    interned into the appended region (offset 0 remains the empty string). This is how a retroport's
+    display rows are merged into the live server CreatureDisplayInfo.dbc / CreatureModelData.dbc.
+    """
+    magic, record_count, field_count, record_size, string_block_size = _HEADER_STRUCT.unpack_from(existing, 0)
+    if magic != WDBC_MAGIC:
+        raise ValueError(f'invalid DBC magic: {magic!r}')
+    if field_count != len(field_types):
+        raise ValueError(f'field-count mismatch: file has {field_count}, definition expects {len(field_types)}')
+
+    start = _HEADER_STRUCT.size
+    records_end = start + record_count * record_size
+    existing_records = existing[start:records_end]
+    string_block = bytearray(existing[records_end:records_end + string_block_size])
+    string_offsets: dict[str, int] = {'': 0}
+
+    def intern(text: str) -> int:
+        if text in string_offsets:
+            return string_offsets[text]
+        offset = len(string_block)
+        string_block.extend(text.encode('utf-8') + b'\x00')
+        string_offsets[text] = offset
+        return offset
+
+    new_record_bytes = bytearray()
+    for row in new_rows:
+        if len(row) != field_count:
+            raise ValueError(f'row has {len(row)} values, expected {field_count}')
+        for ftype, value in zip(field_types, row):
+            if ftype is int:
+                new_record_bytes += struct.pack('<i', int(value))
+            elif ftype is float:
+                new_record_bytes += struct.pack('<f', float(value))
+            elif ftype is str:
+                new_record_bytes += struct.pack('<I', intern(str(value)))
+            else:
+                raise TypeError(f'unsupported DBC field type: {ftype!r}')
+
+    header = _HEADER_STRUCT.pack(WDBC_MAGIC, record_count + len(new_rows), field_count, record_size, len(string_block))
+    return bytes(header) + existing_records + bytes(new_record_bytes) + bytes(string_block)
+
+
+def append_rows_to_dbc_file(path: str, field_types: Sequence[type], new_rows: Sequence[Sequence]) -> int:
+    """Append rows to a WDBC file in place; returns the new total record count."""
+    with open(path, 'rb') as handle:
+        merged = append_rows_to_dbc(handle.read(), field_types, new_rows)
+    with open(path, 'wb') as handle:
+        handle.write(merged)
+    return _HEADER_STRUCT.unpack_from(merged, 0)[1]
+
+
 def parse_dbc(data: bytes) -> dict:
     """Parse a WDBC byte string back into header + raw record/string sections (for validation)."""
     magic, record_count, field_count, record_size, string_block_size = _HEADER_STRUCT.unpack_from(data, 0)
