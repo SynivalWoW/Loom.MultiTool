@@ -14,7 +14,9 @@ from __future__ import annotations
 import glob
 import os
 import platform
+import shutil
 import subprocess
+import tempfile
 
 DEFAULT_CONVERTER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'MultiConverter_Console.exe')
 
@@ -43,6 +45,27 @@ def build_command(m2_path: str, converter: str = DEFAULT_CONVERTER, mono: str = 
     return [converter, m2_path]
 
 
+def _magic(path: str) -> bytes:
+    """Return the first 4 bytes (the M2 magic) of a file."""
+    with open(path, 'rb') as handle:
+        return handle.read(4)
+
+
+def _invoke(run_path, converter, mono, runner, timeout, creationflags):
+    """Run the converter once, returning its return code ('timeout' if mono hung past 'Done.')."""
+    try:
+        result = runner(
+            build_command(run_path, converter, mono),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            creationflags=creationflags,
+        )
+        return getattr(result, 'returncode', None)
+    except subprocess.TimeoutExpired:
+        return 'timeout'
+
+
 def convert_m2(
     m2_path: str,
     converter: str = DEFAULT_CONVERTER,
@@ -50,6 +73,7 @@ def convert_m2(
     runner=subprocess.run,
     timeout: int = 300,
     creationflags: int = 0,
+    attempts: int = 3,
 ) -> dict:
     """Run the MD21->MD20 conversion on a single .m2 and report the outcome.
 
@@ -58,27 +82,37 @@ def convert_m2(
     hang *after* printing 'Done.', so a timeout is treated as a soft outcome and success is decided
     by the on-disk magic. ``creationflags`` is forwarded to the runner (e.g. CREATE_NO_WINDOW on
     Windows). ``runner`` is injectable for testing.
+
+    Robustness on Linux: the bundled converter lower-cases the *entire* path before a case-sensitive
+    ``File.Exists``, so an upper-case PARENT directory makes it read null and crash. We run it through
+    an all-lower-case staging symlink (no large copies — writes land in the real folder), and retry a
+    few times because mono can fail transiently.
     """
     model_dir = os.path.dirname(m2_path) or '.'
     if needs_mono():
         lowercase_dir(model_dir)
         m2_path = os.path.join(model_dir, os.path.basename(m2_path).lower())
 
+    run_path = m2_path
+    staging = None
+    if needs_mono():
+        staging = tempfile.mkdtemp(prefix='loom_lc_')  # mkdtemp names are lower-case
+        link = os.path.join(staging, 'm')
+        os.symlink(os.path.abspath(model_dir), link)
+        run_path = os.path.join(link, os.path.basename(m2_path))
+
+    returncode = None
     try:
-        result = runner(
-            build_command(m2_path, converter, mono),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            creationflags=creationflags,
-        )
-        returncode = getattr(result, 'returncode', None)
-    except subprocess.TimeoutExpired:
-        returncode = 'timeout'
+        for _ in range(max(1, attempts)):
+            returncode = _invoke(run_path, converter, mono, runner, timeout, creationflags)
+            if _magic(m2_path) == b'MD20':
+                break
+    finally:
+        if staging is not None:
+            os.unlink(os.path.join(staging, 'm'))
+            shutil.rmtree(staging, ignore_errors=True)
 
-    with open(m2_path, 'rb') as handle:
-        magic = handle.read(4)
-
+    magic = _magic(m2_path)
     return {
         'm2_path': m2_path,
         'converted': magic == b'MD20',

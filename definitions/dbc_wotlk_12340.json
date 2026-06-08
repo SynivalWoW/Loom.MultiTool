@@ -67,8 +67,7 @@
     "fields": [
       {
         "name": "ID",
-        "type": "int",
-        "index": true
+        "type": "int"
       },
       {
         "name": "DisplayRaceID",
@@ -227,6 +226,170 @@
       {
         "name": "MissileCollisionRaise",
         "type": "float"
+      }
+    ]
+  },
+  "SpellShapeshiftForm": {
+    "fields": [
+      {
+        "name": "ID",
+        "type": "int"
+      },
+      {
+        "name": "BonusActionBar",
+        "type": "int"
+      },
+      {
+        "name": "Name_Lang",
+        "type": "loc"
+      },
+      {
+        "name": "Flags",
+        "type": "int"
+      },
+      {
+        "name": "CreatureType",
+        "type": "int"
+      },
+      {
+        "name": "AttackIconID",
+        "type": "int"
+      },
+      {
+        "name": "CombatRoundTime",
+        "type": "int"
+      },
+      {
+        "name": "CreatureDisplayID",
+        "type": "int",
+        "array": 4
+      },
+      {
+        "name": "PresetSpellID",
+        "type": "int",
+        "array": 8
+      }
+    ]
+  },
+  "CharSections": {
+    "fields": [
+      {
+        "name": "ID",
+        "type": "int"
+      },
+      {
+        "name": "RaceID",
+        "type": "int"
+      },
+      {
+        "name": "SexID",
+        "type": "int"
+      },
+      {
+        "name": "BaseSection",
+        "type": "int"
+      },
+      {
+        "name": "TextureName",
+        "type": "string",
+        "array": 3
+      },
+      {
+        "name": "Flags",
+        "type": "int"
+      },
+      {
+        "name": "VariationIndex",
+        "type": "int"
+      },
+      {
+        "name": "ColorIndex",
+        "type": "int"
+      }
+    ]
+  },
+  "ChrRaces": {
+    "fields": [
+      {
+        "name": "ID",
+        "type": "int"
+      },
+      {
+        "name": "Flags",
+        "type": "int"
+      },
+      {
+        "name": "FactionID",
+        "type": "int"
+      },
+      {
+        "name": "ExplorationSoundID",
+        "type": "int"
+      },
+      {
+        "name": "MaleDisplayId",
+        "type": "int"
+      },
+      {
+        "name": "FemaleDisplayId",
+        "type": "int"
+      },
+      {
+        "name": "ClientPrefix",
+        "type": "string"
+      },
+      {
+        "name": "BaseLanguage",
+        "type": "int"
+      },
+      {
+        "name": "CreatureType",
+        "type": "int"
+      },
+      {
+        "name": "ResSicknessSpellID",
+        "type": "int"
+      },
+      {
+        "name": "SplashSoundID",
+        "type": "int"
+      },
+      {
+        "name": "ClientFilestring",
+        "type": "string"
+      },
+      {
+        "name": "CinematicSequenceID",
+        "type": "int"
+      },
+      {
+        "name": "Alliance",
+        "type": "int"
+      },
+      {
+        "name": "Name_Lang",
+        "type": "loc"
+      },
+      {
+        "name": "Name_Female_Lang",
+        "type": "loc"
+      },
+      {
+        "name": "Name_Male_Lang",
+        "type": "loc"
+      },
+      {
+        "name": "FacialHairCustomization",
+        "type": "string",
+        "array": 2
+      },
+      {
+        "name": "HairCustomization",
+        "type": "string"
+      },
+      {
+        "name": "Required_Expansion",
+        "type": "int"
       }
     ]
   }

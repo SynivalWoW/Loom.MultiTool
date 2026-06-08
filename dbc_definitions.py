@@ -30,9 +30,15 @@ def _table(table: str, definitions: dict | None) -> dict:
 
 
 def field_types(table: str, definitions: dict | None = None) -> list[type]:
-    """Return the python types for every (array-expanded) column of ``table``."""
+    """Return the python types for every (array-expanded) column of ``table``.
+
+    A WotLK localized string ('loc') expands to 16 per-locale string columns + 1 int flags column.
+    """
     columns: list[type] = []
     for field in _table(table, definitions)['fields']:
+        if field['type'] == 'loc':
+            columns += [str] * 16 + [int]
+            continue
         py_type = _TYPE_MAP[field['type']]
         columns += [py_type] * field.get('array', 1)
     return columns
@@ -42,6 +48,9 @@ def field_names(table: str, definitions: dict | None = None) -> list[str]:
     """Return the (array-expanded) column names of ``table`` (e.g. TextureVariation_1..3)."""
     names: list[str] = []
     for field in _table(table, definitions)['fields']:
+        if field['type'] == 'loc':
+            names += [f"{field['name']}_{i + 1}" for i in range(16)] + [f"{field['name']}_flags"]
+            continue
         count = field.get('array', 1)
         if count > 1:
             names += [f"{field['name']}_{i + 1}" for i in range(count)]

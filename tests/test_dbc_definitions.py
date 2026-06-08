@@ -30,6 +30,22 @@ def test_definitions_match_dataclasses():
     assert field_types('CreatureModelData') == types_of(CreatureModelDataRecord)
 
 
+def test_extended_tables_present():
+    defs = load_definitions()
+    for table in ('SpellShapeshiftForm', 'CharSections', 'CreatureDisplayInfoExtra', 'ChrRaces'):
+        assert table in defs
+
+
+def test_loc_expands_to_16_strings_plus_flags():
+    types = field_types('SpellShapeshiftForm')
+    names = field_names('SpellShapeshiftForm')
+    assert len(types) == 35  # 18 scalar/array columns + 17 for the loc field
+    loc_strings = [n for n in names if n.startswith('Name_Lang_') and n != 'Name_Lang_flags']
+    assert len(loc_strings) == 16
+    assert 'Name_Lang_flags' in names
+    assert types[names.index('Name_Lang_flags')] is int
+
+
 def test_unknown_table_raises():
     try:
         field_types('DoesNotExist')

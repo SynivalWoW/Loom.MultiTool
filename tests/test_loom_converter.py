@@ -64,3 +64,77 @@ def test_convert_m2_timeout_falls_back_to_magic(tmp_path, monkeypatch):
     result = convert_m2(str(m2), '/c/conv.exe', 'mono', runner=fake_runner)
     assert result['returncode'] == 'timeout'
     assert result['converted'] is True  # decided by on-disk magic
+
+
+def test_convert_m2_runs_through_lowercase_staging_even_with_uppercase_parent(tmp_path, monkeypatch):
+    # The converter lower-cases the whole path; an upper-case PARENT must not break it on Linux.
+    monkeypatch.setattr('loom_converter.platform.system', lambda: 'Linux')
+    upper_dir = tmp_path / 'UpperCase Dir'
+    upper_dir.mkdir()
+    m2 = upper_dir / 'Model.m2'
+    m2.write_bytes(b'MD21' + b'\x00' * 60)
+
+    captured = {}
+
+    def fake_runner(cmd, **kwargs):
+        captured['cmd'] = cmd
+        with open(cmd[-1], 'wb') as handle:  # write through the staging symlink -> real file
+            handle.write(b'MD20' + b'\x00' * 60)
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    result = convert_m2(str(m2), '/c/conv.exe', 'mono', runner=fake_runner)
+
+    assert result['converted'] is True  # conversion landed in the real (upper-case) folder
+    run_path = captured['cmd'][-1]
+    assert run_path == run_path.lower()  # the path the converter sees is fully lower-case
+    assert os.path.basename(run_path) == 'model.m2'
+    assert not os.path.exists(os.path.dirname(os.path.dirname(run_path)))  # staging cleaned up
+
+
+def test_convert_m2_retries_transient_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr('loom_converter.platform.system', lambda: 'Linux')
+    m2 = tmp_path / 'model.m2'
+    m2.write_bytes(b'MD21' + b'\x00' * 60)
+
+    calls = {'n': 0}
+
+    def fake_runner(cmd, **kwargs):
+        calls['n'] += 1
+
+        class Result:
+            returncode = 1
+
+        if calls['n'] >= 2:  # the second attempt succeeds
+            with open(cmd[-1], 'wb') as handle:
+                handle.write(b'MD20' + b'\x00' * 60)
+            Result.returncode = 0
+        return Result()
+
+    result = convert_m2(str(m2), '/c/conv.exe', 'mono', runner=fake_runner)
+    assert calls['n'] == 2  # retried once, then stopped on success
+    assert result['converted'] is True
+
+
+def test_convert_m2_gives_up_after_all_attempts(tmp_path, monkeypatch):
+    monkeypatch.setattr('loom_converter.platform.system', lambda: 'Linux')
+    m2 = tmp_path / 'model.m2'
+    m2.write_bytes(b'MD21' + b'\x00' * 60)
+
+    calls = {'n': 0}
+
+    def fake_runner(cmd, **kwargs):
+        calls['n'] += 1
+
+        class Result:
+            returncode = 1
+
+        return Result()  # never writes MD20
+
+    result = convert_m2(str(m2), '/c/conv.exe', 'mono', runner=fake_runner, attempts=2)
+    assert calls['n'] == 2  # exhausted the attempts
+    assert result['converted'] is False
+    assert result['returncode'] == 1
