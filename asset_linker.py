@@ -81,14 +81,35 @@ def set_nviews_to_skin_count(m2_path: str, model_dir: str | None = None) -> int:
     return skin_count
 
 
-def validate_vertices(m2_path: str, max_vertices: int = 21845) -> dict:
-    """Report the vertex count and whether it is within the WotLK-safe limit (~21.8k).
+# WotLK skin profiles index vertices with 16-bit ints, so 65535 is the hard ceiling above which a
+# model is genuinely broken; ~21845 (65535/3) is the conservative "no concerns" budget.
+HARD_VERTEX_LIMIT = 65535
 
-    Models above the client's safe vertex budget are a known Error #132 trigger.
+
+def validate_vertices(m2_path: str, max_vertices: int = 21845) -> dict:
+    """Classify the model's vertex count against the WotLK budgets.
+
+    Three tiers, so a loadable-but-heavy model isn't wrongly rejected:
+      * ``safe``     (<= ``max_vertices``)      — within the conservative budget, no concerns.
+      * ``caution``  (<= 65535)                 — over budget but still loads (16-bit indices fit);
+                                                   may strain weak GPUs. Not an Error #132 by itself.
+      * ``overflow`` (> 65535)                  — exceeds the 16-bit index limit; genuinely broken.
     """
     with M2File(m2_path) as m2:
         vertex_count = m2.n_vertices
-    return {'vertex_count': vertex_count, 'vertex_safe': vertex_count <= max_vertices, 'max_vertices': max_vertices}
+    if vertex_count <= max_vertices:
+        status = 'safe'
+    elif vertex_count <= HARD_VERTEX_LIMIT:
+        status = 'caution'
+    else:
+        status = 'overflow'
+    return {
+        'vertex_count': vertex_count,
+        'vertex_safe': vertex_count <= max_vertices,
+        'vertex_loadable': vertex_count <= HARD_VERTEX_LIMIT,
+        'vertex_status': status,
+        'max_vertices': max_vertices,
+    }
 
 
 def check_missing_assets(m2_path: str, model_dir: str | None = None) -> dict:

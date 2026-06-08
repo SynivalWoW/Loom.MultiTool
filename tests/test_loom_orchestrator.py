@@ -83,6 +83,27 @@ def test_run_orchestration_convert_then_repair(tmp_path, monkeypatch):
     assert result['combiner_array'] == [0, 1, 2, 3]
 
 
+def test_run_orchestration_heavy_but_loadable_is_valid(tmp_path):
+    # 30k verts is over the conservative budget but under the 16-bit limit: loadable -> still valid.
+    write_file(str(tmp_path / 'model.m2'), make_m2(global_flags=0x08, combiner_values=[1, 4], n_vertices=30000))
+    write_file(str(tmp_path / 'model00.skin'), make_skin(submesh_bone_count=70, batches=[(2, 2)]))
+
+    result = run_orchestration(str(tmp_path), {'internal_name': 'Cat'})
+    assert result['vertex_safe'] is False
+    assert result['vertex_loadable'] is True
+    assert result['vertex_status'] == 'caution'
+    assert result['valid'] is True  # no longer wrongly rejected
+
+
+def test_run_orchestration_vertex_overflow_is_invalid(tmp_path):
+    write_file(str(tmp_path / 'model.m2'), make_m2(global_flags=0x08, combiner_values=[1, 4], n_vertices=70000))
+    write_file(str(tmp_path / 'model00.skin'), make_skin(submesh_bone_count=70, batches=[(2, 2)]))
+
+    result = run_orchestration(str(tmp_path), {'internal_name': 'Cat'})
+    assert result['vertex_status'] == 'overflow'
+    assert result['valid'] is False
+
+
 def test_run_orchestration_wires_textures_from_txid(tmp_path, monkeypatch):
     # Source MD21 carries a TXID chunk: slot0 hard-coded (fdid 111), slot1 replaceable (fdid 0).
     write_file(str(tmp_path / 'model.m2'), make_md21_txid([111, 0]))

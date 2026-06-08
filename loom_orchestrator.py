@@ -155,11 +155,14 @@ def run_orchestration(
     result['ribbons'] = emitters['ribbons']
     result['vertex_count'] = vertices['vertex_count']
     result['vertex_safe'] = vertices['vertex_safe']
+    result['vertex_loadable'] = vertices['vertex_loadable']
+    result['vertex_status'] = vertices['vertex_status']
     result['missing_textures'] = assets['missing_textures']
     result['anim_count'] = assets['anim_count']
     result['display_id'] = resolved_display_id
-    # Overall gate: only deploy when the binary validation metrics pass (spec §7).
-    result['valid'] = vertices['vertex_safe'] and not assets['missing_textures']
+    # Deploy gate: the model must actually load (<= 65535 verts) and have no missing textures.
+    # `vertex_safe` stays a separate caution flag (over the conservative budget but still loadable).
+    result['valid'] = vertices['vertex_loadable'] and not assets['missing_textures']
 
     if gen_dbc:
         chain_mapping = dict(mapping)

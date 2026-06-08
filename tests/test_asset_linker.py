@@ -58,10 +58,24 @@ def test_set_nviews_no_skins(tmp_path):
 
 def test_validate_vertices(tmp_path):
     safe = write_file(str(tmp_path / 'safe.m2'), make_m2(n_vertices=10000))
-    assert validate_vertices(safe) == {'vertex_count': 10000, 'vertex_safe': True, 'max_vertices': 21845}
+    assert validate_vertices(safe) == {
+        'vertex_count': 10000,
+        'vertex_safe': True,
+        'vertex_loadable': True,
+        'vertex_status': 'safe',
+        'max_vertices': 21845,
+    }
 
-    heavy = write_file(str(tmp_path / 'heavy.m2'), make_m2(n_vertices=30000))
-    assert validate_vertices(heavy)['vertex_safe'] is False
+    # over the conservative budget but under the 16-bit hard limit -> loadable with caution
+    heavy = validate_vertices(write_file(str(tmp_path / 'heavy.m2'), make_m2(n_vertices=30000)))
+    assert heavy['vertex_safe'] is False
+    assert heavy['vertex_loadable'] is True
+    assert heavy['vertex_status'] == 'caution'
+
+    # past 65535 the 16-bit skin indices overflow -> genuinely broken
+    overflow = validate_vertices(write_file(str(tmp_path / 'over.m2'), make_m2(n_vertices=70000)))
+    assert overflow['vertex_loadable'] is False
+    assert overflow['vertex_status'] == 'overflow'
 
 
 def test_check_missing_assets(tmp_path):
