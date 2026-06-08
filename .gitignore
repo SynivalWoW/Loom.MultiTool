@@ -6,3 +6,15 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.log
+
+# stray retroport test artifacts
+/vA/
+/std/
+/nofx/
+/deliver/
+/To Convert/
+*.m2
+*.skin
+*.anim
+*.bone
+*.blp
