@@ -20,6 +20,7 @@ import asset_linker
 import combiner_repair
 import loom_converter
 import loom_dbc_generator
+import texture_linker
 from core_parser import M2File
 
 
@@ -27,6 +28,19 @@ def find_entry_m2(target_dir: str) -> str | None:
     """The model's entry file: the first ``.m2`` in the folder."""
     matches = sorted(glob.glob(os.path.join(target_dir, '*.m2')))
     return matches[0] if matches else None
+
+
+def find_manifest(target_dir: str, entry_basename: str | None = None) -> str | None:
+    """The wow.export ``*.manifest.json`` for the model (prefers one matching the entry name)."""
+    matches = sorted(glob.glob(os.path.join(target_dir, '*.manifest.json')))
+    if not matches:
+        return None
+    if entry_basename:
+        stem = os.path.splitext(entry_basename)[0].lower()
+        for path in matches:
+            if os.path.basename(path).lower().startswith(stem):
+                return path
+    return matches[0]
 
 
 def find_entry_skin(target_dir: str) -> str | None:
@@ -49,6 +63,7 @@ def run_orchestration(
     gen_dbc: bool = False,
     strip_emitters: bool = False,
     clear_combiner: bool = False,
+    link_textures: bool = True,
     max_vertices: int = 21845,
     display_id: int | None = None,
 ) -> dict:
@@ -70,6 +85,16 @@ def run_orchestration(
 
     with M2File(m2_path) as model:
         md21 = model.is_md21
+
+    # Capture the Legion TXID texture FileDataIDs + manifest BEFORE conversion drops the TXID chunk,
+    # so the hard-coded texture filenames can be re-embedded into the downgraded MD20 afterwards.
+    txid_fileids: list[int] = []
+    manifest_map: dict = {}
+    if link_textures and md21:
+        txid_fileids = texture_linker.read_txid_fileids(m2_path)
+        manifest_path = find_manifest(target_dir, os.path.basename(m2_path))
+        if manifest_path:
+            manifest_map = texture_linker.manifest_texture_map(manifest_path)
 
     # Optional MD21->MD20 conversion (the converter does the chunk strip + offset rebasing).
     if convert and md21:
@@ -97,6 +122,13 @@ def run_orchestration(
         asset_linker.set_nviews_to_skin_count(m2_path, target_dir)  # nViews == count of .skin files
         asset_linker.link_anims(target_dir)
         asset_linker.fix_nname(m2_path, internal_name)
+
+    # Re-embed the hard-coded texture filenames the MD21->MD20 converter dropped (TXID chunk), and
+    # report which slots are replaceable (-> CreatureDisplayInfo.TextureVariation) for the DBC layer.
+    if link_textures and txid_fileids and manifest_map:
+        wired = texture_linker.wire_textures(m2_path, txid_fileids, manifest_map, f'Creature\\{internal_name}')
+        result['textures_wired'] = len(wired['embedded'])
+        result['texture_variation_slots'] = sorted(wired['texture_variations'])
 
     skin_path = find_entry_skin(target_dir)
     emitters = asset_linker.evaluate_emitters(m2_path, strip=strip_emitters)

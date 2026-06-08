@@ -1,7 +1,8 @@
+import json
 import os
 
 from loom_orchestrator import run_orchestration, find_entry_m2, find_entry_skin
-from tests._fixtures import make_m2, make_skin, write_file
+from tests._fixtures import make_m2, make_md20_textures, make_md21_txid, make_skin, write_file
 
 
 def _build_model_dir(tmp_path):
@@ -80,6 +81,27 @@ def test_run_orchestration_convert_then_repair(tmp_path, monkeypatch):
     assert result['converted'] is True
     assert result['is_md21'] is False
     assert result['combiner_array'] == [0, 1, 2, 3]
+
+
+def test_run_orchestration_wires_textures_from_txid(tmp_path, monkeypatch):
+    # Source MD21 carries a TXID chunk: slot0 hard-coded (fdid 111), slot1 replaceable (fdid 0).
+    write_file(str(tmp_path / 'model.m2'), make_md21_txid([111, 0]))
+    write_file(str(tmp_path / 'model00.skin'), make_skin(submesh_bone_count=70, batches=[(0, 1)]))
+    (tmp_path / 'model.manifest.json').write_text(json.dumps({'textures': [{'fileDataID': 111, 'file': '..\\x\\body.blp'}]}))
+
+    def fake_convert(m2_path, *args, **kwargs):
+        # the real converter emits a flat MD20 with blank texture strings (type0 + type11 here)
+        with open(m2_path, 'wb') as handle:
+            handle.write(make_md20_textures([0, 11]))
+        return {'converted': True, 'm2_path': m2_path, 'magic': 'MD20', 'returncode': 0}
+
+    monkeypatch.setattr('loom_orchestrator.loom_converter.convert_m2', fake_convert)
+
+    result = run_orchestration(str(tmp_path), {'internal_name': 'druidx'}, convert=True, fix_combiners=False)
+
+    assert result['textures_wired'] == 1                 # the hard-coded slot got its filename back
+    assert result['texture_variation_slots'] == [0]      # type 11 -> CreatureDisplayInfo.TextureVariation[0]
+    assert b'Creature\\druidx\\body.blp' in open(str(tmp_path / 'model.m2'), 'rb').read()
 
 
 def test_run_orchestration_generates_dbc(tmp_path):

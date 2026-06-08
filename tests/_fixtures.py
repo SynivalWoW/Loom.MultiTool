@@ -87,6 +87,31 @@ def make_skin(submesh_bone_count: int = 10, batches=None) -> bytes:
     return bytes(header + submesh + units)
 
 
+def make_md20_textures(types) -> bytes:
+    """A minimal MD20 with one texture slot per entry in ``types``, each with an empty filename.
+
+    Mirrors a freshly-converted MD21->MD20 model whose inline texture strings the converter left
+    blank (the TXID-driven texture_linker is what fills them back in).
+    """
+    buf = bytearray(0x140)
+    buf[0:4] = b'MD20'
+    ofs = len(buf)
+    buf += bytearray(16 * len(types))
+    for i, ttype in enumerate(types):
+        struct.pack_into('<IIII', buf, ofs + i * 16, ttype, 0, 0, 0)  # type, flags, nFilename=0, ofsFilename=0
+    struct.pack_into('<I', buf, 80, len(types))  # nTextures
+    struct.pack_into('<I', buf, 84, ofs)         # ofsTextures
+    return bytes(buf)
+
+
+def make_md21_txid(fileids, md20_body: bytes = b'\x00' * 16) -> bytes:
+    """A Legion MD21 wrapper carrying a TXID chunk of the given texture FileDataIDs."""
+    out = bytearray(b'MD21' + struct.pack('<I', len(md20_body)) + md20_body)
+    txid = b''.join(struct.pack('<I', f) for f in fileids)
+    out += b'TXID' + struct.pack('<I', len(txid)) + txid
+    return bytes(out)
+
+
 def write_file(path: str, data: bytes) -> str:
     with open(path, 'wb') as handle:
         handle.write(data)
